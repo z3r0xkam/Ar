@@ -1,348 +1,188 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Caesar Cipher Camera Decoder</title>
+    <title>AR Caesar Cipher Decryption</title>
     <style>
         body {
             margin: 0;
-            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             font-family: Arial, sans-serif;
-            overflow: hidden;
-            background-color: #f0f0f0;
         }
-        
-        #video-container {
-            position: relative;
+        #video, #canvas {
             width: 100%;
-            height: 100vh;
-            display: none; /* Hidden until camera access granted */
+            max-width: 640px;
+            height: auto;
         }
-        
-        #camera-feed {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: none;
         }
-        
-        /* Permission Modal Styling */
-        #permission-modal {
+        /* Modal styles */
+        .modal {
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: flex;
+            background-color: rgba(0, 0, 0, 0.5);
             justify-content: center;
             align-items: center;
-            z-index: 1000;
         }
-        
         .modal-content {
             background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            max-width: 90%;
-            width: 400px;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-        
-        .modal-title {
-            font-size: 24px;
-            margin-bottom: 15px;
-            color: #333;
-        }
-        
-        .modal-message {
-            font-size: 16px;
-            line-height: 1.5;
-            margin-bottom: 25px;
-            color: #555;
-        }
-        
-        .modal-button {
-            padding: 12px 25px;
-            background-color: #4285F4;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        
-        .modal-button:hover {
-            background-color: #3367d6;
-        }
-        
-        /* Camera alert styling */
-        #camera-alert {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-            z-index: 1001;
-            display: none;
+            border-radius: 5px;
             text-align: center;
             max-width: 80%;
         }
-        
-        .interface {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 15px;
-            box-sizing: border-box;
-        }
-        
-        .controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        
-        #shift-input {
-            width: 60px;
-            text-align: center;
-            font-size: 18px;
-        }
-        
-        button {
+        .modal-content button {
+            margin: 10px;
             padding: 10px 20px;
-            background-color: #4285F4;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-        
-        #detected-text, #decrypted-text {
-            margin: 10px 0;
-            font-size: 18px;
-        }
-        
-        #decrypted-text {
-            color: #4CAF50;
-            font-weight: bold;
-        }
-        
-        .overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-        
-        .instructions {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 15px;
-            text-align: center;
-            z-index: 100;
-        }
-        
-        .hidden {
-            display: none;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <!-- Permission Modal -->
-    <div id="permission-modal">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+
+    <!-- Modal for camera permission request -->
+    <div id="cameraModal" class="modal">
         <div class="modal-content">
-            <div class="modal-title">Camera Access Required</div>
-            <div class="modal-message">
-                <p>This app needs to access your camera to decode encrypted messages.</p>
-                <p>When prompted, please click "Allow" to grant camera permission.</p>
-                <p><strong>Your camera will only be used while you have this app open.</strong></p>
-            </div>
-            <button class="modal-button" id="request-camera">Allow Camera Access</button>
+            <h2>Camera Access Required</h2>
+            <p>We need access to your phone's camera to decrypt the message using AR. Please allow camera access to proceed.</p>
+            <button id="allowCamera">Allow</button>
+            <button id="denyCamera">Deny</button>
         </div>
     </div>
-    
-    <!-- Camera Alert for Permission Denied -->
-    <div id="camera-alert">
-        <h3>Camera Access Denied</h3>
-        <p>You need to allow camera access for this app to work.</p>
-        <p>Please check your browser settings and enable camera access for this website.</p>
-        <p>On most devices, you can look for a camera icon in the address bar or site settings.</p>
-        <button onclick="showPermissionModal()">Try Again</button>
-    </div>
-    
-    <!-- Camera and AR View (hidden until permission granted) -->
-    <div id="video-container" class="hidden">
-        <video id="camera-feed" autoplay playsinline></video>
-        <div class="overlay" id="ar-overlay"></div>
-        
-        <div class="instructions" id="instructions">
-            <h2>Caesar Cipher Camera Decoder</h2>
-            <p>Point your camera at the encrypted text. Adjust the shift value to decrypt.</p>
-            <button onclick="document.getElementById('instructions').classList.add('hidden')">Got it!</button>
-        </div>
-        
-        <div class="interface">
-            <div class="controls">
-                <label for="shift-input">Shift value:</label>
-                <input type="number" id="shift-input" min="1" max="25" value="3">
-                <button id="capture-btn">Capture Text</button>
-            </div>
-            <div id="detected-text">Encrypted: [Point camera at text]</div>
-            <div id="decrypted-text">Decrypted: [Waiting for capture]</div>
-        </div>
-    </div>
-    
+
+    <!-- Load required libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+
     <script>
-        // Elements
-        const permissionModal = document.getElementById('permission-modal');
-        const cameraAlert = document.getElementById('camera-alert');
-        const requestCameraBtn = document.getElementById('request-camera');
-        const videoContainer = document.getElementById('video-container');
-        const video = document.getElementById('camera-feed');
-        const captureBtn = document.getElementById('capture-btn');
-        const shiftInput = document.getElementById('shift-input');
-        const detectedTextElement = document.getElementById('detected-text');
-        const decryptedTextElement = document.getElementById('decrypted-text');
-        const arOverlay = document.getElementById('ar-overlay');
-        
-        // Show the permission modal again
-        function showPermissionModal() {
-            cameraAlert.style.display = 'none';
-            permissionModal.classList.remove('hidden');
-        }
-        
-        // Function to request camera access
-        async function requestCameraAccess() {
-            try {
-                // Request camera with environment facing (back camera) preference
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
-                });
-                
-                // Camera access granted
-                video.srcObject = stream;
-                
-                // Hide permission modal and show video container
-                permissionModal.classList.add('hidden');
-                videoContainer.classList.remove('hidden');
-                
-                console.log("Camera started successfully");
-            } catch (err) {
-                console.error("Error accessing camera:", err);
-                
-                // Show camera access denied alert
-                permissionModal.classList.add('hidden');
-                cameraAlert.style.display = 'block';
-            }
-        }
-        
-        // Add click event to request camera button
-        requestCameraBtn.addEventListener('click', requestCameraAccess);
-        
-        // Capture button event
-        captureBtn.addEventListener('click', function() {
-            simulateTextDetection();
-        });
-        
-        // Simulated text detection (in a real app, this would use OCR)
-        function simulateTextDetection() {
-            // Sample encrypted messages
-            const sampleEncryptedTexts = [
-                "ZHOFRPH WR VDARQB",
-                "JGNNQY HTQI IGTOCP XKUKVQTU",
-                "FDHVDU FLSKHU GHFUBSWLRQ",
-                "WKH WUHDVXUH LV KLGGHQ",
-                "FRQJUDWXODWLRQV BRX GLG LW"
-            ];
-            
-            // Randomly select one of the sample texts
-            const randomIndex = Math.floor(Math.random() * sampleEncryptedTexts.length);
-            const detectedText = sampleEncryptedTexts[randomIndex];
-            
-            // Update the UI with the detected text
-            detectedTextElement.textContent = `Encrypted: ${detectedText}`;
-            
-            // Get the shift value from the input
-            const shift = parseInt(shiftInput.value);
-            
-            // Decrypt the text
-            const decryptedText = caesarDecrypt(detectedText, shift);
-            
-            // Update the UI with the decrypted text
-            decryptedTextElement.textContent = `Decrypted: ${decryptedText}`;
-            
-            // Create AR overlay effect
-            createAREffect(detectedText, decryptedText);
-        }
-        
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const shiftValue = 3; // Caesar cipher shift value (adjust as needed)
+        const modal = document.getElementById('cameraModal');
+        const allowCameraBtn = document.getElementById('allowCamera');
+        const denyCameraBtn = document.getElementById('denyCamera');
+
         // Caesar cipher decryption function
         function caesarDecrypt(text, shift) {
-            return text.split('').map(char => {
-                // Only decrypt letters
-                if (char.match(/[a-z]/i)) {
-                    const code = char.charCodeAt(0);
-                    const isUpperCase = code >= 65 && code <= 90;
-                    const offset = isUpperCase ? 65 : 97;
-                    
-                    // Apply decryption formula: (c - shift) % 26
-                    return String.fromCharCode(
-                        (((code - offset - shift) % 26 + 26) % 26) + offset
-                    );
-                }
-                return char; // Return unchanged if not a letter
-            }).join('');
+            const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const shifted = alphabet.slice(shift) + alphabet.slice(0, shift);
+            return text.toUpperCase().replace(/[A-Z]/g, (char) => {
+                const index = shifted.indexOf(char);
+                return index !== -1 ? alphabet[index] : char;
+            });
         }
-        
-        // Create a simple AR effect overlay
-        function createAREffect(encrypted, decrypted) {
-            // Clear previous overlay
-            arOverlay.innerHTML = '';
-            
-            // Create a new overlay element
-            const overlayElement = document.createElement('div');
-            overlayElement.style.position = 'absolute';
-            overlayElement.style.top = '50%';
-            overlayElement.style.left = '50%';
-            overlayElement.style.transform = 'translate(-50%, -50%)';
-            overlayElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-            overlayElement.style.color = '#4CAF50';
-            overlayElement.style.padding = '20px';
-            overlayElement.style.borderRadius = '10px';
-            overlayElement.style.fontSize = '20px';
-            overlayElement.style.textAlign = 'center';
-            
-            // Create visualization of the mapping
-            const mappingHtml = encrypted.split('').map((char, index) => {
-                if (char === ' ') return ' ';
-                const decryptedChar = decrypted[index] || '';
-                return `<span style="margin: 0 2px;"><span style="color: red;">${char}</span> → <span style="color: green;">${decryptedChar}</span></span>`;
-            }).join(' ');
-            
-            overlayElement.innerHTML = `<div>Decryption Mapping:</div>${mappingHtml}`;
-            
-            // Add to the overlay container
-            arOverlay.appendChild(overlayElement);
-            
-            // Remove after 5 seconds
-            setTimeout(() => {
-                arOverlay.innerHTML = '';
-            }, 5000);
+
+        // Show the modal when the page loads
+        window.onload = () => {
+            modal.style.display = 'flex';
+        };
+
+        // Handle "Allow" button click
+        allowCameraBtn.onclick = () => {
+            modal.style.display = 'none';
+            initializeCamera();
+        };
+
+        // Handle "Deny" button click
+        denyCameraBtn.onclick = () => {
+            modal.style.display = 'none';
+            alert('Camera access was denied. This app requires camera access to function.');
+        };
+
+        // Initialize camera
+        function initializeCamera() {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then((stream) => {
+                    video.srcObject = stream;
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        processFrame();
+                    };
+                })
+                .catch((error) => {
+                    console.error('Error accessing camera:', error);
+                    alert('Failed to access the camera. Please allow camera permissions in your browser settings.');
+                });
+        }
+
+        // Process video frames
+        let lastProcessedTime = 0;
+        const processingInterval = 1000; // Process every 1 second to reduce load
+
+        function processFrame() {
+            const currentTime = Date.now();
+            if (currentTime - lastProcessedTime < processingInterval) {
+                requestAnimationFrame(processFrame);
+                return;
+            }
+
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+            if (code) {
+                const qrCodePosition = {
+                    x: code.location.topLeftCorner.x,
+                    y: code.location.topLeftCorner.y,
+                    width: code.location.bottomRightCorner.x - code.location.topLeftCorner.x,
+                    height: code.location.bottomRightCorner.y - code.location.topLeftCorner.y
+                };
+
+                // Define text region to the right of the QR code
+                const textRegion = {
+                    x: qrCodePosition.x + qrCodePosition.width + 10,
+                    y: qrCodePosition.y,
+                    width: 200, // Adjust based on your encrypted text size
+                    height: qrCodePosition.height
+                };
+
+                // Extract text region for OCR
+                const textCanvas = document.createElement('canvas');
+                textCanvas.width = textRegion.width;
+                textCanvas.height = textRegion.height;
+                const textContext = textCanvas.getContext('2d');
+                textContext.drawImage(canvas, textRegion.x, textRegion.y, textRegion.width, textRegion.height, 0, 0, textRegion.width, textRegion.height);
+
+                // Perform OCR with Tesseract.js
+                Tesseract.recognize(
+                    textCanvas,
+                    'eng',
+                    { logger: (m) => console.log(m) }
+                ).then(({ data: { text } }) => {
+                    const encryptedText = text.trim().toUpperCase();
+                    const decryptedText = caesarDecrypt(encryptedText, shiftValue);
+
+                    // Overlay decrypted text
+                    context.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Semi-transparent white background
+                    context.fillRect(textRegion.x, textRegion.y, textRegion.width, textRegion.height);
+                    context.fillStyle = 'black';
+                    context.font = '24px Arial';
+                    context.fillText(decryptedText, textRegion.x + 5, textRegion.y + 30);
+                }).catch((error) => {
+                    console.error('OCR Error:', error);
+                });
+
+                lastProcessedTime = currentTime;
+            }
+
+            requestAnimationFrame(processFrame);
         }
     </script>
 </body>
