@@ -1,172 +1,70 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Caesar Cipher AR Decoder</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ar.js/2.2.2/aframe-ar.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.2.0/aframe.min.js"></script>
+    <title>Phone Camera Webpage</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
-        .interface {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            z-index: 10;
-        }
-        .controls {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-        }
-        #shift-input {
-            width: 60px;
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
             text-align: center;
-            font-size: 18px;
+        }
+        #my-camera {
+            width: 100%;
+            max-width: 640px;
+            margin: 10px auto;
         }
         button {
-            padding: 8px 15px;
-            background-color: #4285F4;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        #detected-text {
-            font-size: 18px;
-            margin-bottom: 10px;
-        }
-        #decrypted-text {
-            font-size: 20px;
-            font-weight: bold;
-            color: #4CAF50;
-        }
-        .instructions {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 15px;
-            text-align: center;
-            z-index: 10;
-        }
-        .hidden {
-            display: none;
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
         }
     </style>
 </head>
 <body>
-    <div class="instructions" id="instructions">
-        <h2>Caesar Cipher AR Decoder</h2>
-        <p>Point your camera at the encrypted text. Adjust the shift value to decrypt correctly.</p>
-        <button onclick="document.getElementById('instructions').classList.add('hidden')">Got it!</button>
-    </div>
-
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-        <a-camera position="0 0 0" look-controls-enabled="false"></a-camera>
-    </a-scene>
-
-    <div class="interface">
-        <div class="controls">
-            <label for="shift-input">Shift value:</label>
-            <input type="number" id="shift-input" min="1" max="25" value="3">
-            <button id="capture-btn">Capture Text</button>
+    <div class="container">
+        <h1>Phone Camera Access</h1>
+        <video id="my-camera" autoplay playsinline></video>
+        <div>
+            <button onclick="startCamera()">Start Camera</button>
+            <button onclick="stopCamera()">Stop Camera</button>
         </div>
-        <div id="detected-text">Encrypted: [Point camera at text]</div>
-        <div id="decrypted-text">Decrypted: [Waiting for capture]</div>
     </div>
 
+    <!-- Include Webcam Easy library from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/webcam-easy@1.0.5/dist/webcam-easy.min.js"></script>
     <script>
-        // In a real AR text recognition app, we'd use something like Tesseract.js
-        // or a cloud service for OCR. For demo purposes, we'll simulate text detection
-        // and focus on the decryption aspect.
-        
-        document.getElementById('capture-btn').addEventListener('click', function() {
-            // Simulating text detection
-            // In a real app, this would process camera input with OCR
-            simulateTextDetection();
-        });
+        // Initialize variables
+        let webcam;
+        const videoElement = document.getElementById('my-camera');
 
-        function simulateTextDetection() {
-            // This simulates detection - in a real app, you'd use OCR on camera feed
-            const sampleEncryptedTexts = [
-                "ZHOFRPH WR VDARQB",
-                "JGNNQY HTQI IGTOCP XKUKVQTU",
-                "FDHVDU FLSKHU GHFUBSWLRQ",
-                "WKH WUHDVXUH LV KLGGHQ",
-                "FRQJUDWXODWLRQV BRX GLG LW"
-            ];
+        // Function to start the camera
+        function startCamera() {
+            // Initialize webcam with video element
+            webcam = new Webcam(videoElement, 'user');
             
-            const randomIndex = Math.floor(Math.random() * sampleEncryptedTexts.length);
-            const detectedText = sampleEncryptedTexts[randomIndex];
-            
-            document.getElementById('detected-text').textContent = `Encrypted: ${detectedText}`;
-            
-            // Decrypt with current shift value
-            const shift = parseInt(document.getElementById('shift-input').value);
-            const decryptedText = caesarDecrypt(detectedText, shift);
-            
-            document.getElementById('decrypted-text').textContent = `Decrypted: ${decryptedText}`;
-            
-            // In a real app, this would create AR overlay showing the decryption mapping
-            createAROverlay(detectedText, decryptedText);
+            // Start the webcam
+            webcam.start()
+                .then(result => {
+                    console.log("Webcam started successfully");
+                })
+                .catch(err => {
+                    console.error("Error starting webcam:", err);
+                    alert("Error: Could not access camera. Please ensure you have given permission.");
+                });
         }
 
-        function caesarDecrypt(text, shift) {
-            return text.split('').map(char => {
-                if (char.match(/[a-z]/i)) {
-                    const code = char.charCodeAt(0);
-                    const isUpperCase = code >= 65 && code <= 90;
-                    const offset = isUpperCase ? 65 : 97;
-                    
-                    // Apply decryption formula: (c - shift) % 26
-                    return String.fromCharCode(
-                        (((code - offset - shift) % 26 + 26) % 26) + offset
-                    );
-                }
-                return char; // Return unchanged if not a letter
-            }).join('');
+        // Function to stop the camera
+        function stopCamera() {
+            if (webcam) {
+                webcam.stop();
+                console.log("Webcam stopped");
+            }
         }
 
-        function createAROverlay(encrypted, decrypted) {
-            // In a real AR implementation, this would create 3D text overlays
-            // positioned over the detected text in the camera view
-            console.log("AR overlay would show mapping from", encrypted, "to", decrypted);
-            // This would use AR.js or Three.js to create the visual mapping
-            
-            // Simulated feedback in this demo
-            const overlay = document.createElement('div');
-            overlay.style.position = 'fixed';
-            overlay.style.top = '50%';
-            overlay.style.left = '50%';
-            overlay.style.transform = 'translate(-50%, -50%)';
-            overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-            overlay.style.color = '#4CAF50';
-            overlay.style.padding = '20px';
-            overlay.style.borderRadius = '10px';
-            overlay.style.fontSize = '24px';
-            overlay.style.zIndex = '100';
-            overlay.textContent = 'AR mapping active!';
-            
-            document.body.appendChild(overlay);
-            setTimeout(() => {
-                document.body.removeChild(overlay);
-            }, 2000);
-        }
+        // Optional: Start camera automatically when page loads
+        window.onload = startCamera;
     </script>
 </body>
 </html>
