@@ -1,354 +1,93 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cipher Decoder (Shift 3)</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      background-color: #000;
-    }
-    
-    .container {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      overflow: hidden;
-      position: relative;
-    }
-    
-    #video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    
-    #canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-    }
-    
-    .controls {
-      position: fixed;
-      bottom: 0;
-      width: 100%;
-      padding: 15px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      z-index: 10;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    
-    button {
-      background: #4CAF50;
-      border: none;
-      color: white;
-      padding: 10px 20px;
-      text-align: center;
-      text-decoration: none;
-      display: inline-block;
-      font-size: 16px;
-      margin: 4px 2px;
-      cursor: pointer;
-      border-radius: 4px;
-    }
-    
-    .detected-text {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 10px;
-      border-radius: 5px;
-      z-index: 10;
-      max-width: 90%;
-      font-size: 14px;
-      max-height: 30%;
-      overflow-y: auto;
-    }
-    
-    .decoded-text {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: rgba(0, 0, 0, 0.7);
-      color: #4CAF50;
-      padding: 10px;
-      border-radius: 5px;
-      z-index: 10;
-      max-width: 90%;
-      font-size: 14px;
-      max-height: 30%;
-      overflow-y: auto;
-    }
-    
-    .decoded-overlay {
-      position: absolute;
-      background: rgba(255, 255, 255, 0.8);
-      border-radius: 4px;
-      padding: 5px 10px;
-      font-weight: bold;
-      z-index: 5;
-    }
-    
-    .demo-section {
-      position: absolute;
-      bottom: 80px;
-      width: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 10px;
-      z-index: 9;
-      display: none;
-    }
-    
-    .demo-section.active {
-      display: block;
-    }
-    
-    .demo-input {
-      width: 90%;
-      margin: 10px auto;
-      padding: 10px;
-      display: block;
-      background: #333;
-      color: white;
-      border: 1px solid #555;
-      border-radius: 4px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Text Decoder</title>
+    <script src="https://cdn.jsdelivr.net/npm/webcam-easy@1.0.5/dist/webcam-easy.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.1/dist/tesseract.min.js"></script>
+    <style>
+        video, canvas { 
+            width: 100%;
+            max-width: 640px;
+            margin: 10px 0;
+        }
+        #output {
+            margin: 20px;
+            font-size: 18px;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
-    <div class="detected-text" id="detected-text">No text detected</div>
-    <div class="decoded-text" id="decoded-text"></div>
-    
-    <div class="demo-section" id="demo-section">
-      <textarea class="demo-input" id="demo-input" rows="4" placeholder="Enter cipher text to decode">Zhofrph wr VHX Xqlyhuvlwb! Zh duh gholjkwhg wr kdyh brx zlwk xv wrgdb dv zh vkrzfdvh rxu dgydqfhphqwv lq frpsxwlqj vhfxulwb. Brxu ylvlw lv dq krqru, dqg zh orrn iruzdug wr lqvljkwixo glvfxvvlrqv dqg ixwxuh fROoderudwlrqv</textarea>
-      <button id="decode-demo">Decode Demo Text</button>
-    </div>
-  </div>
-  
-  <div class="controls">
-    <button id="start-camera">Start Camera</button>
-    <button id="toggle-camera">Switch Camera</button>
-    <button id="toggle-demo">Show Demo Mode</button>
-  </div>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <div id="output"></div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.3/tesseract.min.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const video = document.getElementById('video');
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
-      const startCameraButton = document.getElementById('start-camera');
-      const toggleCameraButton = document.getElementById('toggle-camera');
-      const toggleDemoButton = document.getElementById('toggle-demo');
-      const demoSection = document.getElementById('demo-section');
-      const decodeDemoButton = document.getElementById('decode-demo');
-      const demoInput = document.getElementById('demo-input');
-      const detectedTextElement = document.getElementById('detected-text');
-      const decodedTextElement = document.getElementById('decoded-text');
-      
-      let currentStream = null;
-      let preferredCameraFacing = "environment"; // Start with back camera
-      let overlayElements = [];
-      let processingActive = false;
-      
-      // Initialize Tesseract worker
-      const worker = Tesseract.createWorker();
-      
-      async function initTesseract() {
-        await worker.load();
-        await worker.loadLanguage('eng');
-        await worker.initialize('eng');
-      }
-      
-      initTesseract();
-      
-      // Start camera
-      async function startCamera() {
-        if (currentStream) {
-          currentStream.getTracks().forEach(track => track.stop());
-        }
+    <script>
+        const webcamElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('canvas');
+        const outputElement = document.getElementById('output');
         
-        try {
-          const constraints = {
-            video: {
-              facingMode: preferredCameraFacing
-            }
-          };
-          
-          currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-          video.srcObject = currentStream;
-          
-          // Set canvas dimensions after video loads
-          video.onloadedmetadata = () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            // Start processing frames
-            processingActive = true;
-            processVideoFrames();
-          };
-          
-        } catch (err) {
-          console.error("Error starting camera:", err);
-          detectedTextElement.textContent = "Camera error: " + err.message;
-        }
-      }
-      
-      // Toggle between front and back camera
-      function toggleCamera() {
-        preferredCameraFacing = preferredCameraFacing === "environment" ? "user" : "environment";
-        startCamera();
-      }
-      
-      // Toggle demo section
-      function toggleDemo() {
-        demoSection.classList.toggle('active');
-      }
-      
-      // Decode shift cipher (shift 3)
-      function decipherShift3(text) {
-        return text.split('').map(char => {
-          const code = char.charCodeAt(0);
-          
-          // Handle uppercase letters
-          if (code >= 65 && code <= 90) {
-            return String.fromCharCode(((code - 65 - 3 + 26) % 26) + 65);
-          }
-          
-          // Handle lowercase letters
-          if (code >= 97 && code <= 122) {
-            return String.fromCharCode(((code - 97 - 3 + 26) % 26) + 97);
-          }
-          
-          // Return non-alphabetic characters as is
-          return char;
-        }).join('');
-      }
-      
-      // Create AR-like overlay for decoded text
-      function createOverlay(original, decoded, x, y) {
-        // Remove old overlays
-        overlayElements.forEach(el => {
-          if (el && el.parentNode) {
-            el.parentNode.removeChild(el);
-          }
-        });
-        overlayElements = [];
+        // Initialize webcam with back camera
+        const webcam = new Webcam(webcamElement, 'environment', canvasElement);
         
-        // Create new overlay
-        const overlay = document.createElement('div');
-        overlay.className = 'decoded-overlay';
-        overlay.textContent = decoded;
-        overlay.style.left = `${x}px`;
-        overlay.style.top = `${y}px`;
-        document.querySelector('.container').appendChild(overlay);
-        overlayElements.push(overlay);
-      }
-      
-      // Process video frames to detect text
-      async function processVideoFrames() {
-        if (!processingActive) return;
-        
-        if (!video.paused && !video.ended) {
-          // Draw current video frame to canvas
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          // Extract frame as image data
-          const imageData = canvas.toDataURL('image/jpeg');
-          
-          try {
-            // Recognize text in the image
-            const { data } = await worker.recognize(imageData);
-            
-            if (data.text.trim() !== '') {
-              const detectedText = data.text.trim();
-              const decodedText = decipherShift3(detectedText);
-              
-              // Update text displays
-              detectedTextElement.textContent = `Detected: ${detectedText}`;
-              decodedTextElement.textContent = `Decoded: ${decodedText}`;
-              
-              // Process each word with confidence
-              data.words.forEach(word => {
-                if (word.confidence > 60) {  // Only process words with decent confidence
-                  const originalText = word.text;
-                  const decodedText = decipherShift3(originalText);
-                  
-                  // Create overlay at word position
-                  const { x0, y0 } = word.bbox;
-                  createOverlay(originalText, decodedText, x0, y0 - 30);
+        // Start webcam
+        webcam.start()
+            .then(result => {
+                console.log("Webcam started");
+                detectText();
+            })
+            .catch(err => {
+                console.log(err);
+            });
+
+        // Target cipher text
+        const targetCipher = "Zhofrph wr VHX Xqlyhuvlwb! Zh duh gholjkwhg wr kdyh brx zlwk xv wrgdb dv zh vkrzfdvh rxu dgydqfhphqwv lq frpsxwlqj vhfxulwb. Brxu ylvlw lv dq krqru, dqg zh orrn iruzdug wr lqvljkwixo glvfxvvlrqv dqg ixwxuh fROoderudwlrqv";
+
+        function decodeCaesarCipher(str, shift) {
+            return str.split('').map(char => {
+                if (char.match(/[a-zA-Z]/)) {
+                    const code = char.charCodeAt(0);
+                    const base = code >= 65 && code <= 90 ? 65 : 97;
+                    return String.fromCharCode(((code - base - shift + 26) % 26) + base);
                 }
-              });
+                return char;
+            }).join('');
+        }
+
+        async function detectText() {
+            while (true) {
+                // Capture frame from webcam
+                const picture = webcam.snap();
+                canvasElement.src = picture;
+
+                // Recognize text
+                const result = await Tesseract.recognize(
+                    canvasElement,
+                    'eng',
+                    { logger: m => console.log(m) }
+                );
+
+                let detectedText = result.data.text
+                    .replace(/\n/g, ' ')  // Replace newlines with spaces
+                    .replace(/[^a-zA-Z\s!.]/g, ''); // Clean up special characters
+
+                // Convert to uppercase to match target cipher format
+                detectedText = detectedText.toUpperCase();
+
+                // Check if detected text matches target cipher
+                if (detectedText.includes(targetCipher)) {
+                    const decodedMessage = decodeCaesarCipher(targetCipher, 3);
+                    outputElement.innerHTML = `Decoded Message: ${decodedMessage}`;
+                    break;
+                } else {
+                    outputElement.innerHTML = 'Scanning... No match found yet';
+                }
+
+                // Wait before next detection
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
-          } catch (err) {
-            console.error("Text recognition error:", err);
-          }
         }
-        
-        // Continue processing frames
-        requestAnimationFrame(processVideoFrames);
-      }
-      
-      // Decode demo text
-      function decodeDemo() {
-        const demoText = demoInput.value.trim();
-        if (demoText) {
-          const decoded = decipherShift3(demoText);
-          
-          detectedTextElement.textContent = `Demo Text: ${demoText}`;
-          decodedTextElement.textContent = `Decoded: ${decoded}`;
-          
-          // Create a simple overlay
-          const containerRect = document.querySelector('.container').getBoundingClientRect();
-          createOverlay(demoText, decoded, containerRect.width / 2 - 100, containerRect.height / 2);
-        }
-      }
-      
-      // Decode the default message on page load
-      function decodeDefaultMessage() {
-        const defaultText = "Zhofrph wr VHX Xqlyhuvlwb! Zh duh gholjkwhg wr kdyh brx zlwk xv wrgdb dv zh vkrzfdvh rxu dgydqfhphqwv lq frpsxwlqj vhfxulwb. Brxu ylvlw lv dq krqru, dqg zh orrn iruzdug wr lqvljkwixo glvfxvvlrqv dqg ixwxuh fROoderudwlrqv";
-        const decoded = decipherShift3(defaultText);
-        
-        detectedTextElement.textContent = `Message: ${defaultText}`;
-        decodedTextElement.textContent = `Decoded: ${decoded}`;
-      }
-      
-      // Execute default message decoding
-      setTimeout(decodeDefaultMessage, 500);
-      
-      // Button event listeners
-      startCameraButton.addEventListener('click', startCamera);
-      toggleCameraButton.addEventListener('click', toggleCamera);
-      toggleDemoButton.addEventListener('click', toggleDemo);
-      decodeDemoButton.addEventListener('click', decodeDemo);
-      
-      // Clean up on page unload
-      window.addEventListener('beforeunload', () => {
-        processingActive = false;
-        if (currentStream) {
-          currentStream.getTracks().forEach(track => track.stop());
-        }
-        worker.terminate();
-      });
-    });
-  </script>
+    </script>
 </body>
 </html>
