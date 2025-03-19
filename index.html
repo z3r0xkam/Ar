@@ -45,6 +45,9 @@
       background: rgba(0, 0, 0, 0.7);
       color: white;
       z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
     }
     
     button {
@@ -70,8 +73,25 @@
       padding: 10px;
       border-radius: 5px;
       z-index: 10;
-      max-width: 80%;
+      max-width: 90%;
       font-size: 14px;
+      max-height: 30%;
+      overflow-y: auto;
+    }
+    
+    .decoded-text {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #4CAF50;
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 10;
+      max-width: 90%;
+      font-size: 14px;
+      max-height: 30%;
+      overflow-y: auto;
     }
     
     .decoded-overlay {
@@ -82,6 +102,32 @@
       font-weight: bold;
       z-index: 5;
     }
+    
+    .demo-section {
+      position: absolute;
+      bottom: 80px;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      z-index: 9;
+      display: none;
+    }
+    
+    .demo-section.active {
+      display: block;
+    }
+    
+    .demo-input {
+      width: 90%;
+      margin: 10px auto;
+      padding: 10px;
+      display: block;
+      background: #333;
+      color: white;
+      border: 1px solid #555;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -89,11 +135,18 @@
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
     <div class="detected-text" id="detected-text">No text detected</div>
+    <div class="decoded-text" id="decoded-text"></div>
+    
+    <div class="demo-section" id="demo-section">
+      <textarea class="demo-input" id="demo-input" rows="4" placeholder="Enter cipher text to decode">Zhofrph wr VHX Xqlyhuvlwb! Zh duh gholjkwhg wr kdyh brx zlwk xv wrgdb dv zh vkrzfdvh rxu dgydqfhphqwv lq frpsxwlqj vhfxulwb. Brxu ylvlw lv dq krqru, dqg zh orrn iruzdug wr lqvljkwixo glvfxvvlrqv dqg ixwxuh fROoderudwlrqv</textarea>
+      <button id="decode-demo">Decode Demo Text</button>
+    </div>
   </div>
   
   <div class="controls">
     <button id="start-camera">Start Camera</button>
     <button id="toggle-camera">Switch Camera</button>
+    <button id="toggle-demo">Show Demo Mode</button>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.3/tesseract.min.js"></script>
@@ -104,11 +157,17 @@
       const ctx = canvas.getContext('2d');
       const startCameraButton = document.getElementById('start-camera');
       const toggleCameraButton = document.getElementById('toggle-camera');
+      const toggleDemoButton = document.getElementById('toggle-demo');
+      const demoSection = document.getElementById('demo-section');
+      const decodeDemoButton = document.getElementById('decode-demo');
+      const demoInput = document.getElementById('demo-input');
       const detectedTextElement = document.getElementById('detected-text');
+      const decodedTextElement = document.getElementById('decoded-text');
       
       let currentStream = null;
       let preferredCameraFacing = "environment"; // Start with back camera
       let overlayElements = [];
+      let processingActive = false;
       
       // Initialize Tesseract worker
       const worker = Tesseract.createWorker();
@@ -143,6 +202,7 @@
             canvas.height = video.videoHeight;
             
             // Start processing frames
+            processingActive = true;
             processVideoFrames();
           };
           
@@ -156,6 +216,11 @@
       function toggleCamera() {
         preferredCameraFacing = preferredCameraFacing === "environment" ? "user" : "environment";
         startCamera();
+      }
+      
+      // Toggle demo section
+      function toggleDemo() {
+        demoSection.classList.toggle('active');
       }
       
       // Decode shift cipher (shift 3)
@@ -200,6 +265,8 @@
       
       // Process video frames to detect text
       async function processVideoFrames() {
+        if (!processingActive) return;
+        
         if (!video.paused && !video.ended) {
           // Draw current video frame to canvas
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -212,8 +279,12 @@
             const { data } = await worker.recognize(imageData);
             
             if (data.text.trim() !== '') {
-              // Update detected text display
-              detectedTextElement.textContent = `Detected: ${data.text.trim()}`;
+              const detectedText = data.text.trim();
+              const decodedText = decipherShift3(detectedText);
+              
+              // Update text displays
+              detectedTextElement.textContent = `Detected: ${detectedText}`;
+              decodedTextElement.textContent = `Decoded: ${decodedText}`;
               
               // Process each word with confidence
               data.words.forEach(word => {
@@ -236,12 +307,42 @@
         requestAnimationFrame(processVideoFrames);
       }
       
+      // Decode demo text
+      function decodeDemo() {
+        const demoText = demoInput.value.trim();
+        if (demoText) {
+          const decoded = decipherShift3(demoText);
+          
+          detectedTextElement.textContent = `Demo Text: ${demoText}`;
+          decodedTextElement.textContent = `Decoded: ${decoded}`;
+          
+          // Create a simple overlay
+          const containerRect = document.querySelector('.container').getBoundingClientRect();
+          createOverlay(demoText, decoded, containerRect.width / 2 - 100, containerRect.height / 2);
+        }
+      }
+      
+      // Decode the default message on page load
+      function decodeDefaultMessage() {
+        const defaultText = "Zhofrph wr VHX Xqlyhuvlwb! Zh duh gholjkwhg wr kdyh brx zlwk xv wrgdb dv zh vkrzfdvh rxu dgydqfhphqwv lq frpsxwlqj vhfxulwb. Brxu ylvlw lv dq krqru, dqg zh orrn iruzdug wr lqvljkwixo glvfxvvlrqv dqg ixwxuh fROoderudwlrqv";
+        const decoded = decipherShift3(defaultText);
+        
+        detectedTextElement.textContent = `Message: ${defaultText}`;
+        decodedTextElement.textContent = `Decoded: ${decoded}`;
+      }
+      
+      // Execute default message decoding
+      setTimeout(decodeDefaultMessage, 500);
+      
       // Button event listeners
       startCameraButton.addEventListener('click', startCamera);
       toggleCameraButton.addEventListener('click', toggleCamera);
+      toggleDemoButton.addEventListener('click', toggleDemo);
+      decodeDemoButton.addEventListener('click', decodeDemo);
       
       // Clean up on page unload
       window.addEventListener('beforeunload', () => {
+        processingActive = false;
         if (currentStream) {
           currentStream.getTracks().forEach(track => track.stop());
         }
