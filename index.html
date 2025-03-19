@@ -3,14 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phone Camera Webpage</title>
+    <title>Back Camera Cipher AR</title>
     <style>
         .container {
             max-width: 800px;
             margin: 20px auto;
             text-align: center;
+            position: relative;
         }
         #my-camera {
+            width: 100%;
+            max-width: 640px;
+            margin: 10px auto;
+        }
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             max-width: 640px;
             margin: 10px auto;
@@ -24,46 +33,93 @@
 </head>
 <body>
     <div class="container">
-        <h1>Phone Camera Access</h1>
+        <h1>Back Camera Cipher AR (Shift 3)</h1>
         <video id="my-camera" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
         <div>
             <button onclick="startCamera()">Start Camera</button>
             <button onclick="stopCamera()">Stop Camera</button>
         </div>
     </div>
 
-    <!-- Include Webcam Easy library from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/webcam-easy@1.0.5/dist/webcam-easy.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
     <script>
-        // Initialize variables
         let webcam;
         const videoElement = document.getElementById('my-camera');
+        const canvasElement = document.getElementById('canvas');
+        const canvasCtx = canvasElement.getContext('2d');
 
-        // Function to start the camera
+        // Caesar shift decryption (shift 3)
+        function decryptCaesarShift(text, shift = 3) {
+            return text.toUpperCase().replace(/[A-Z]/g, char => {
+                let code = char.charCodeAt(0) - 65; // Convert to 0-25
+                code = (code - shift + 26) % 26; // Shift back and wrap around
+                return String.fromCharCode(code + 65); // Back to letter
+            });
+        }
+
+        // Start camera with back facing mode
         function startCamera() {
-            // Initialize webcam with video element
-            webcam = new Webcam(videoElement, 'user');
+            webcam = new Webcam(videoElement, 'environment'); // 'environment' for back camera
             
-            // Start the webcam
             webcam.start()
-                .then(result => {
-                    console.log("Webcam started successfully");
+                .then(() => {
+                    console.log("Back camera started");
+                    canvasElement.width = videoElement.videoWidth;
+                    canvasElement.height = videoElement.videoHeight;
+                    processVideo();
                 })
                 .catch(err => {
-                    console.error("Error starting webcam:", err);
-                    alert("Error: Could not access camera. Please ensure you have given permission.");
+                    console.error("Error starting camera:", err);
+                    alert("Error: Could not access back camera. Please ensure permission is granted.");
                 });
         }
 
-        // Function to stop the camera
+        // Stop camera
         function stopCamera() {
             if (webcam) {
                 webcam.stop();
-                console.log("Webcam stopped");
+                console.log("Camera stopped");
             }
         }
 
-        // Optional: Start camera automatically when page loads
+        // Process video frames and detect text
+        async function processVideo() {
+            if (!webcam || !webcam.webcamElement.srcObject) return;
+
+            // Capture frame
+            canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+            const imageData = canvasCtx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+
+            // Use Tesseract.js for OCR
+            try {
+                const { data } = await Tesseract.recognize(imageData, 'eng', {
+                    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                });
+
+                if (data.text) {
+                    const cipherText = data.text.trim();
+                    const plainText = decryptCaesarShift(cipherText, 3);
+
+                    // Draw AR overlay
+                    canvasCtx.font = '30px Arial';
+                    canvasCtx.fillStyle = 'yellow';
+                    canvasCtx.textAlign = 'center';
+
+                    // Position text near detected text (using first confidence box as reference)
+                    const textBox = data.words[0]?.bbox || { x0: 50, y0: 50 };
+                    canvasCtx.fillText(plainText, textBox.x0 + 50, textBox.y0 + 50);
+                }
+            } catch (err) {
+                console.error("OCR Error:", err);
+            }
+
+            // Continue processing
+            requestAnimationFrame(processVideo);
+        }
+
+        // Start camera on load
         window.onload = startCamera;
     </script>
 </body>
